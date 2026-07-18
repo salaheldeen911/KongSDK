@@ -289,7 +289,7 @@ Below is a quick reference table of core parameters supported by the API.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `mode` | string | *required* | Source type: `url`, `html`, `office`, `markdown` |
+| `mode` | string | *required* | Source type: `url`, `html`, `office`, `markdown`, `image` *(Set automatically by SDK)* |
 | `url` | string | null | The webpage URL to convert (If `mode=url`). |
 | `html` | string | null | Raw HTML string to convert (If `mode=html`). |
 | `markdown` | string | null | Raw Markdown to convert (If `mode=markdown`). |
