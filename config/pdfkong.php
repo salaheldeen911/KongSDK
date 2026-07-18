@@ -59,4 +59,19 @@ return [
         'region'             => env('PDFKONG_S3_REGION', 'us-east-1'),
         'path_prefix'        => env('PDFKONG_S3_PATH_PREFIX', ''), // e.g. 'exports/pdfs/'
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Google Cloud Storage Delivery Configuration
+    |--------------------------------------------------------------------------
+    | If you plan to use delivery_mode = 'google_storage', you can define your GCS credentials
+    | here. The package will automatically attach these to your request when 
+    | Google Storage delivery is requested.
+    */
+    'google_storage' => [
+        'project_id'  => env('PDFKONG_GCP_PROJECT_ID'),
+        'user_email'  => env('PDFKONG_GCP_USER_EMAIL'),
+        'private_key' => env('PDFKONG_GCP_PRIVATE_KEY'),
+        'bucket_name' => env('PDFKONG_GCP_BUCKET'),
+    ],
 ];

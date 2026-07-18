@@ -1,0 +1,28 @@
+/vendor/
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Laravel 4 specific
+bootstrap/compiled.php
+app/storage/
+
+# Laravel 5 & Lumen specific
+public/storage
+public/hot
+
+# Laravel 5 & Lumen specific - config
+.env
+.env.backup
+.env.*
+
+# Laravel package specific
+composer.lock
+.phpunit.cache
+.phpunit.result.cache
+
+# Mac OS
+.DS_Store
+
+# Windows
+Thumbs.db

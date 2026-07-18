@@ -30,6 +30,11 @@ namespace PDFKong\Contracts;
  * @method $this footerHtml(string $html)
  * @method $this parseLiquid(bool $enable = true)
  * @method $this liquidData(array|string $data)
+ * @method $this deliverToS3(array $config = [])
+ * @method $this deliverToWebhook(?string $endpoint = null)
+ * @method $this deliverToGoogleStorage(array $config = [])
+ * @method $this returnAsBase64()
+ * @method $this deliveryMode(string $mode)
  */
 interface PDFKongClientInterface
 {

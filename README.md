@@ -139,28 +139,31 @@ PDFKong::url('https://example.com')
     ->send(); // Returns JSON with task_id immediately.
 ```
 
-### Deliver via Base64 or other modes
-The API supports returning the PDF as a Base64 string directly inside the JSON response, or uploading to Google Cloud Storage. You can use the magic method `deliveryMode()` to trigger these.
+### Deliver via Google Cloud Storage
+Ensure your GCP credentials are set in `.env` (like `PDFKONG_GCP_BUCKET`).
 ```php
-// Get PDF as a Base64 String
-$response = PDFKong::url('https://example.com')
-    ->deliveryMode('base64')
-    ->send();
-    
-echo $response['base64_data']; // Contains the raw base64 string
-
-// Google Cloud Storage
 PDFKong::url('https://example.com')
-    ->deliveryMode('google_storage')
-    ->with('gcs_bucket_name', 'my-bucket')
+    ->deliverToGoogleStorage() // Uploads directly to your configured GCS Bucket
     ->send();
 ```
 
+### Deliver via Base64
+The API supports returning the PDF as a Base64 string directly inside the JSON response. You can use the `returnAsBase64()` method to trigger this.
+```php
+// Get PDF as a Base64 String
+$response = PDFKong::url('https://example.com')
+    ->returnAsBase64()
+    ->send();
+    
+echo $response['base64_data']; // Contains the raw base64 string
+```
+
 ### Manual Async Mode
-If you want to run the job asynchronously without using Webhooks or S3 (perhaps you want to poll the status manually using `batchStatus` or checking the file later), you can explicitly call the `async()` method:
+If you want to run the job asynchronously without using Webhooks or S3 (perhaps you want to poll the status manually using `batchStatus` or checking the file later), you must explicitly tell the API to store the file on its server:
 ```php
 PDFKong::url('https://example.com')
     ->async() // Forces the API to process this in the background
+    ->storeFile() // Required when using async without Webhook/S3
     ->send(); 
 ```
 
@@ -195,7 +198,8 @@ PDFKong::batchDownload('batch_uuid_here', storage_path('app/public/batch_output.
 ---
 
 ## 🔧 Magic Methods for Extra Parameters
-If the API supports a new parameter (e.g., `prefer_css_page_size` or `print_background`), you can call it using camelCase. The SDK will automatically convert it to `snake_case` for the API.
+If the API supports a new parameter (e.g., `prefer_css_page_size` or `print_background`), you can call it using camelCase. The SDK will automatically convert it to `snake_case` for the API. 
+📚 **View all supported parameters here:** [https://pdfkong.online/docs/intro](https://pdfkong.online/docs/intro)
 
 ```php
 PDFKong::url('https://example.com')

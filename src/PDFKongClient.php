@@ -344,6 +344,36 @@ class PDFKongClient implements PDFKongClientInterface
     }
 
     /**
+     * Deliver the result to Google Cloud Storage.
+     *
+     * @param array $config Pass an array of GCP config, or leave empty to use default config.
+     * @return $this
+     */
+    public function deliverToGoogleStorage(array $config = []): self
+    {
+        $this->payload['delivery_mode'] = 'google_storage';
+        $this->payload['async'] = true; // Auto-enable async for GCS delivery
+        
+        $this->payload['gcp_project_id'] = $config['project_id'] ?? config('pdfkong.google_storage.project_id');
+        $this->payload['gcp_user_email'] = $config['user_email'] ?? config('pdfkong.google_storage.user_email');
+        $this->payload['gcp_private_key'] = $config['private_key'] ?? config('pdfkong.google_storage.private_key');
+        $this->payload['gcp_bucket_name'] = $config['bucket_name'] ?? config('pdfkong.google_storage.bucket_name');
+        
+        return $this;
+    }
+
+    /**
+     * Request the API to return the PDF as a Base64 string.
+     *
+     * @return $this
+     */
+    public function returnAsBase64(): self
+    {
+        $this->payload['delivery_mode'] = 'base64';
+        return $this;
+    }
+
+    /**
      * Deliver the result to a Webhook.
      *
      * @param string|null $endpoint
@@ -466,47 +496,7 @@ class PDFKongClient implements PDFKongClientInterface
      */
     public function getAsBytes(): string
     {
-        $this->preValidate();
-
-        $baseUrl = config('pdfkong.base_url', 'https://pdfkong.online/api/v1');
-        $endpoint = rtrim($baseUrl, '/') . '/convert';
-
-        $request = $this->buildRequest();
-
-        if (!empty($this->files)) {
-            $request = $request->asMultipart();
-            foreach ($this->files as $key => $file) {
-                if (is_array($file)) {
-                    foreach ($file as $f) {
-                        if ($f instanceof \Illuminate\Http\UploadedFile) {
-                            $request->attach($key . '[]', file_get_contents($f->path()), $f->getClientOriginalName());
-                        } else {
-                            $request->attach($key . '[]', file_get_contents($f), basename($f));
-                        }
-                    }
-                } else {
-                    if ($file instanceof \Illuminate\Http\UploadedFile) {
-                        $request->attach($key, file_get_contents($file->path()), $file->getClientOriginalName());
-                    } else {
-                        // Use a generic key 'files[]' if numeric index, else use the string key
-                        $formKey = is_int($key) ? 'files[]' : $key;
-                        $request->attach($formKey, file_get_contents($file), basename($file));
-                    }
-                }
-            }
-            $response = $request->post($endpoint, $this->payload);
-        } elseif (!empty($this->filePath)) {
-            $filename = basename($this->filePath);
-            $response = $request->attach('file', file_get_contents($this->filePath), $filename)
-                ->post($endpoint, $this->payload);
-        } else {
-            $response = $request->post($endpoint, $this->payload);
-        }
-
-        if ($response->failed()) {
-            $this->handleFailedResponse($response);
-        }
-
+        $response = $this->executeConversionRequest();
         return $response->body();
     }
 
@@ -531,7 +521,18 @@ class PDFKongClient implements PDFKongClientInterface
      */
     public function send(): array
     {
-        // Force delivery mode to JSON if not set, though the API defaults to JSON anyway.
+        $response = $this->executeConversionRequest();
+        return $response->json() ?? [];
+    }
+
+    /**
+     * Execute the conversion request to the API.
+     *
+     * @return \Illuminate\Http\Client\Response
+     * @throws PDFKongException
+     */
+    protected function executeConversionRequest()
+    {
         $this->preValidate();
 
         $baseUrl = config('pdfkong.base_url', 'https://pdfkong.online/api/v1');
@@ -573,7 +574,7 @@ class PDFKongClient implements PDFKongClientInterface
             $this->handleFailedResponse($response);
         }
 
-        return $response->json() ?? [];
+        return $response;
     }
 
     /**

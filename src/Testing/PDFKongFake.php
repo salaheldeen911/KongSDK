@@ -138,6 +138,40 @@ class PDFKongFake implements PDFKongClientInterface
         return $this;
     }
 
+    public function deliverToGoogleStorage(array $config = []): self
+    {
+        $this->currentPayload['delivery_mode'] = 'google_storage';
+        $this->currentPayload['async'] = true;
+        
+        $this->currentPayload['gcp_project_id'] = $config['project_id'] ?? 'fake_project';
+        $this->currentPayload['gcp_user_email'] = $config['user_email'] ?? 'fake_email';
+        $this->currentPayload['gcp_private_key'] = $config['private_key'] ?? 'fake_key';
+        $this->currentPayload['gcp_bucket_name'] = $config['bucket_name'] ?? 'fake_bucket';
+        
+        return $this;
+    }
+
+    public function returnAsBase64(): self
+    {
+        $this->currentPayload['delivery_mode'] = 'base64';
+        return $this;
+    }
+
+    public function deliverToS3(array $config = []): self
+    {
+        $this->currentPayload['delivery_mode'] = 's3';
+        $this->currentPayload['async'] = true;
+        return $this;
+    }
+
+    public function deliverToWebhook(?string $endpoint = null): self
+    {
+        $this->currentPayload['delivery_mode'] = 'webhook';
+        $this->currentPayload['async'] = true;
+        $this->currentPayload['webhook_endpoint'] = $endpoint;
+        return $this;
+    }
+
     public function __call(string $method, array $parameters)
     {
         $key = \Illuminate\Support\Str::snake($method);
