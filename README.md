@@ -75,6 +75,14 @@ PDFKong::markdown('# Title \n\n This is a **markdown** text.')
     ->save(storage_path('app/public/markdown.pdf'));
 ```
 
+### 5. Convert Image to PDF
+```php
+use PDFKong\Facades\PDFKong;
+
+PDFKong::image(storage_path('app/images/photo.jpg'))
+    ->save(storage_path('app/public/photo.pdf'));
+```
+
 ---
 
 ## 🎨 Formatting and Customization
