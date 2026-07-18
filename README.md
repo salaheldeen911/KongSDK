@@ -2,6 +2,8 @@
 
 A simple, fluent, and powerful Laravel package for interacting with the **PDFKong API**. Convert URLs, HTML, Office documents, and Markdown into high-quality PDF files with ease.
 
+📚 **PDFKong Documentation:** [https://pdfkong.online/docs/intro](https://pdfkong.online/docs/intro)
+
 ## 🚀 Installation
 
 Install the package via Composer:
@@ -61,7 +63,7 @@ return response($pdfBytes, 200, [
 ```php
 use PDFKong\Facades\PDFKong;
 
-PDFKong::file(storage_path('app/documents/invoice.docx'))
+PDFKong::office(storage_path('app/documents/invoice.docx'))
     ->save(storage_path('app/public/invoice.pdf'));
 ```
 
@@ -119,12 +121,14 @@ PDFKong::url('https://example.com')
 
 If you are processing large files, you might want to offload the delivery using **Webhooks** or **Amazon S3**, so your server doesn't have to wait.
 
+*Note: Calling `deliverToWebhook()` or `deliverToS3()` will automatically enable the `async` parameter in the background, making the API return immediately.*
+
 ### Deliver via Webhook
 If you set `PDFKONG_WEBHOOK_URL` in your `.env`, the package will deduce the URL automatically:
 ```php
 PDFKong::url('https://example.com')
     ->deliverToWebhook() // Reads default from config, or pass a custom URL here
-    ->send(); // Use send() instead of save() to avoid downloading bytes
+    ->send(); // Use send() instead of save() to avoid downloading bytes. It will return a JSON with a task_id immediately.
 ```
 
 ### Deliver via Amazon S3
@@ -132,7 +136,60 @@ Ensure your S3 credentials are set in `.env` (like `PDFKONG_S3_BUCKET`).
 ```php
 PDFKong::url('https://example.com')
     ->deliverToS3() // Uploads directly to your configured S3 Bucket
+    ->send(); // Returns JSON with task_id immediately.
+```
+
+### Deliver via Base64 or other modes
+The API supports returning the PDF as a Base64 string directly inside the JSON response, or uploading to Google Cloud Storage. You can use the magic method `deliveryMode()` to trigger these.
+```php
+// Get PDF as a Base64 String
+$response = PDFKong::url('https://example.com')
+    ->deliveryMode('base64')
     ->send();
+    
+echo $response['base64_data']; // Contains the raw base64 string
+
+// Google Cloud Storage
+PDFKong::url('https://example.com')
+    ->deliveryMode('google_storage')
+    ->with('gcs_bucket_name', 'my-bucket')
+    ->send();
+```
+
+### Manual Async Mode
+If you want to run the job asynchronously without using Webhooks or S3 (perhaps you want to poll the status manually using `batchStatus` or checking the file later), you can explicitly call the `async()` method:
+```php
+PDFKong::url('https://example.com')
+    ->async() // Forces the API to process this in the background
+    ->send(); 
+```
+
+---
+
+---
+
+## 🛠️ Management & Utility Methods
+
+The SDK also supports the management endpoints available in the API, allowing you to check usage, manage generated PDFs, and handle batch downloads.
+
+```php
+use PDFKong\Facades\PDFKong;
+
+// 1. Get Account Usage & Limits
+$usage = PDFKong::usage();
+print_r($usage);
+
+// 2. List previously generated PDFs (Pagination: page, per_page)
+$list = PDFKong::list(1, 15);
+
+// 3. Remove a specific PDF from the server
+$removed = PDFKong::remove('task_uuid_here');
+
+// 4. Check the status of an asynchronous batch job
+$status = PDFKong::batchStatus('batch_uuid_here');
+
+// 5. Download a completed batch job (e.g. ZIP file)
+PDFKong::batchDownload('batch_uuid_here', storage_path('app/public/batch_output.zip'));
 ```
 
 ---
@@ -146,6 +203,70 @@ PDFKong::url('https://example.com')
     ->landscape()           // Maps to 'landscape' => true (if no arg provided, defaults to true)
     ->emulateMedia('screen') // Maps to 'emulate_media' => 'screen'
     ->save('output.pdf');
+```
+
+## 🛡️ Enterprise Features
+
+We've built this SDK to be robust and ready for large-scale applications.
+
+### 1. Testing (Fake)
+When writing your tests, you shouldn't hit the real API. Use `PDFKong::fake()` to mock the SDK.
+```php
+use PDFKong\Facades\PDFKong;
+
+PDFKong::fake();
+
+// Run your application code...
+PDFKong::url('https://example.com')->save('test.pdf');
+
+// Assert that a conversion was requested
+PDFKong::assertConverted('url');
+```
+
+### 2. Auto-Retry Mechanism
+Network instability happens. You can tell the SDK to automatically retry failed requests:
+```php
+PDFKong::url('https://example.com')
+    ->retry(3, 100) // Retry up to 3 times, with a 100ms delay between attempts
+    ->save('output.pdf');
+```
+
+### 3. Custom Guzzle/HTTP Options
+If your server sits behind a proxy, or you need to disable SSL verification locally, you can pass custom options to the underlying Laravel HTTP Client:
+```php
+PDFKong::url('https://example.com')
+    ->withOptions(['verify' => false, 'proxy' => 'http://localhost:8080'])
+    ->save('output.pdf');
+```
+
+### 4. Custom Exceptions
+The SDK throws specific exceptions based on the HTTP status code, allowing you to catch and handle them gracefully:
+- `PDFKongAuthenticationException` (401/403)
+- `PDFKongInsufficientCreditsException` (402)
+- `PDFKongValidationException` (422)
+- `PDFKongRateLimitException` (429)
+- `PDFKongException` (General)
+
+```php
+use PDFKong\Exceptions\PDFKongInsufficientCreditsException;
+
+try {
+    PDFKong::url('https://example.com')->save('output.pdf');
+} catch (PDFKongInsufficientCreditsException $e) {
+    // Notify user to top up balance
+}
+```
+
+### 5. Type-Safe Enums
+Instead of using raw strings for parameters, you can use the provided Enums for type safety:
+```php
+use PDFKong\Enums\PageSize;
+use PDFKong\Enums\DeliveryMode;
+
+PDFKong::url('https://example.com')
+    ->deliveryMode(DeliveryMode::S3->value)
+    ->pageFormat(PageSize::A4->value)
+    ->send();
 ```
 
 ---
@@ -166,7 +287,7 @@ Below is a quick reference table of core parameters supported by the API.
 | `print_background` | boolean | `true` | Print background graphics and colors. |
 | `emulate_media` | string | `print` | CSS media emulation: `print` or `screen`. |
 | `store_file` | boolean | `false` | Keeps the generated file on PDFKong servers for 24 hours. |
-| `delivery_mode` | string | `json` | Where to deliver the output: `json`, `webhook`, `s3`. |
+| `delivery_mode` | string | `json` | Where to deliver the output: `json`, `webhook`, `s3`, `base64`, `google_storage`, `inline`, `attachment` |
 | `watermark` | boolean | `false` | Enables watermarking if set to true. |
 | `watermark_text` | string | null | The text used for watermarking. |
 | `watermark_img` | string | null | URL of the image used for watermarking. |

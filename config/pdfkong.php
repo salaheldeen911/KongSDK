@@ -14,7 +14,7 @@ return [
     // or URL signing to ensure your API Key is protected.
     'secret_key' => env('PDFKONG_SECRET_KEY'),
     
-    'base_url' => env('PDFKONG_BASE_URL', 'https://pdfkong.maktaby.online/api/v1'),
+    'base_url' => env('PDFKONG_BASE_URL', 'https://pdfkong.online/api/v1'),
     
     /*
     |--------------------------------------------------------------------------

@@ -50,12 +50,52 @@ interface PDFKongClientInterface
     public function html(string $html);
 
     /**
-     * Start a conversion from a local Office/File path.
+     * Start a conversion from an Office file.
      *
      * @param string $filePath
      * @return \PDFKong\PDFKongClient
      */
-    public function file(string $filePath);
+    public function office(string $filePath);
+
+    /**
+     * Merge multiple PDFs.
+     *
+     * @param array $filePaths
+     * @return \PDFKong\PDFKongClient
+     */
+    public function merge(array $filePaths);
+
+    /**
+     * Add a watermark to a PDF.
+     *
+     * @param string $filePath
+     * @return \PDFKong\PDFKongClient
+     */
+    public function watermark(string $filePath);
+
+    /**
+     * Protect a PDF.
+     *
+     * @param string $filePath
+     * @return \PDFKong\PDFKongClient
+     */
+    public function protect(string $filePath);
+
+    /**
+     * Start a raw payload request.
+     *
+     * @param array $payload
+     * @param array $files
+     * @return \PDFKong\PDFKongClient
+     */
+    public function raw(array $payload, array $files = []);
+
+    /**
+     * Get the parameters schema from the API.
+     *
+     * @return array
+     */
+    public function schema(): array;
 
     /**
      * Start a conversion from Markdown content.
@@ -79,4 +119,70 @@ interface PDFKongClientInterface
      * @return string
      */
     public function getAsBytes(): string;
+
+    /**
+     * Get the current user's usage and credits.
+     *
+     * @return array
+     */
+    public function usage(): array;
+
+    /**
+     * Get a paginated list of previously generated PDFs.
+     *
+     * @param int $page
+     * @param int $perPage
+     * @return array
+     */
+    public function list(int $page = 1, int $perPage = 15): array;
+
+    /**
+     * Delete a specific PDF file from the server.
+     *
+     * @param string $taskId
+     * @return array
+     */
+    public function remove(string $taskId): array;
+
+    /**
+     * Check the status of an asynchronous batch job.
+     *
+     * @param string $batchId
+     * @return array
+     */
+    public function batchStatus(string $batchId): array;
+
+    /**
+     * Download a completed batch job.
+     *
+     * @param string $batchId
+     * @param string $savePath
+     * @return bool
+     */
+    public function batchDownload(string $batchId, string $savePath): bool;
+
+    /**
+     * Run the conversion asynchronously in the background.
+     *
+     * @param bool $enable
+     * @return \PDFKong\PDFKongClient
+     */
+    public function async(bool $enable = true);
+
+    /**
+     * Specify the number of times to retry the request if it fails.
+     *
+     * @param int $times
+     * @param int $sleepMilliseconds
+     * @return \PDFKong\PDFKongClient
+     */
+    public function retry(int $times, int $sleepMilliseconds = 0);
+
+    /**
+     * Add custom HTTP client options (e.g. proxy, verify).
+     *
+     * @param array $options
+     * @return \PDFKong\PDFKongClient
+     */
+    public function withOptions(array $options);
 }

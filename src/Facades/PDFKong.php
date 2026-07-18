@@ -41,6 +41,18 @@ use Illuminate\Support\Facades\Facade;
  */
 class PDFKong extends Facade
 {
+    /**
+     * Replace the bound instance with a fake.
+     *
+     * @return \PDFKong\Testing\PDFKongFake
+     */
+    public static function fake()
+    {
+        $fake = new \PDFKong\Testing\PDFKongFake();
+        static::swap($fake);
+        return $fake;
+    }
+
     protected static function getFacadeAccessor()
     {
         return 'pdfkong';

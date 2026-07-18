@@ -5,6 +5,10 @@ namespace PDFKong;
 use Illuminate\Support\Facades\Http;
 use PDFKong\Contracts\PDFKongClientInterface;
 use PDFKong\Exceptions\PDFKongException;
+use PDFKong\Exceptions\PDFKongAuthenticationException;
+use PDFKong\Exceptions\PDFKongInsufficientCreditsException;
+use PDFKong\Exceptions\PDFKongValidationException;
+use PDFKong\Exceptions\PDFKongRateLimitException;
 
 class PDFKongClient implements PDFKongClientInterface
 {
@@ -21,6 +25,67 @@ class PDFKongClient implements PDFKongClientInterface
      * @var string|null
      */
     protected ?string $filePath = null;
+
+    /**
+     * Array of files for multi-file operations.
+     *
+     * @var array
+     */
+    protected array $files = [];
+
+    /**
+     * Flag indicating a raw payload request.
+     *
+     * @var bool
+     */
+    protected bool $isRaw = false;
+
+    /**
+     * Retry times.
+     *
+     * @var int
+     */
+    protected int $retryTimes = 0;
+
+    /**
+     * Retry sleep milliseconds.
+     *
+     * @var int
+     */
+    protected int $retrySleep = 0;
+
+    /**
+     * Custom HTTP options.
+     *
+     * @var array
+     */
+    protected array $httpOptions = [];
+
+    /**
+     * Specify the number of times to retry the request if it fails.
+     *
+     * @param int $times
+     * @param int $sleepMilliseconds
+     * @return $this
+     */
+    public function retry(int $times, int $sleepMilliseconds = 0): self
+    {
+        $this->retryTimes = $times;
+        $this->retrySleep = $sleepMilliseconds;
+        return $this;
+    }
+
+    /**
+     * Add custom HTTP client options (e.g. proxy, verify).
+     *
+     * @param array $options
+     * @return $this
+     */
+    public function withOptions(array $options): self
+    {
+        $this->httpOptions = $options;
+        return $this;
+    }
 
     /**
      * Start a conversion from a URL.
@@ -49,16 +114,91 @@ class PDFKongClient implements PDFKongClientInterface
     }
 
     /**
-     * Start a conversion from a local Office/File path.
+     * Start a conversion from an Office file.
      *
      * @param string $filePath
      * @return $this
      */
-    public function file(string $filePath): self
+    public function office(string $filePath): self
     {
         $this->payload['mode'] = 'office';
         $this->filePath = $filePath;
         return $this;
+    }
+
+    /**
+     * Merge multiple PDFs.
+     *
+     * @param array $filePaths
+     * @return $this
+     */
+    public function merge(array $filePaths): self
+    {
+        $this->payload['mode'] = 'merge';
+        $this->files = $filePaths;
+        return $this;
+    }
+
+    /**
+     * Add a watermark to a PDF.
+     *
+     * @param string $filePath
+     * @return $this
+     */
+    public function watermark(string $filePath): self
+    {
+        $this->payload['mode'] = 'watermark';
+        $this->filePath = $filePath;
+        return $this;
+    }
+
+    /**
+     * Protect a PDF.
+     *
+     * @param string $filePath
+     * @return $this
+     */
+    public function protect(string $filePath): self
+    {
+        $this->payload['mode'] = 'protect';
+        $this->filePath = $filePath;
+        return $this;
+    }
+
+    /**
+     * Start a raw payload request.
+     *
+     * @param array $payload
+     * @param array $files
+     * @return $this
+     */
+    public function raw(array $payload, array $files = []): self
+    {
+        $this->isRaw = true;
+        $this->payload = $payload;
+        $this->files = $files;
+        return $this;
+    }
+
+    /**
+     * Get the parameters schema from the API.
+     *
+     * @return array
+     */
+    public function schema(): array
+    {
+        $baseUrl = config('pdfkong.base_url', 'https://pdfkong.online/api/v1');
+        $endpoint = rtrim($baseUrl, '/') . '/parameters';
+        
+        $request = $this->buildRequest();
+        
+        $response = $request->get($endpoint);
+        
+        if ($response->successful()) {
+            return $response->json('data') ?? [];
+        }
+        
+        return [];
     }
 
     /**
@@ -187,6 +327,7 @@ class PDFKongClient implements PDFKongClientInterface
     public function deliverToS3(array $config = []): self
     {
         $this->payload['delivery_mode'] = 's3';
+        $this->payload['async'] = true; // Auto-enable async for S3 delivery
         
         $this->payload['s3_bucket_name'] = $config['bucket_name'] ?? config('pdfkong.s3.bucket_name');
         $this->payload['s3_access_key_id'] = $config['access_key_id'] ?? config('pdfkong.s3.access_key_id');
@@ -211,6 +352,7 @@ class PDFKongClient implements PDFKongClientInterface
     public function deliverToWebhook(?string $endpoint = null): self
     {
         $this->payload['delivery_mode'] = 'webhook';
+        $this->payload['async'] = true; // Auto-enable async for Webhook delivery
         $this->payload['webhook_endpoint'] = $endpoint ?? config('pdfkong.webhook.default_endpoint');
         return $this;
     }
@@ -235,6 +377,10 @@ class PDFKongClient implements PDFKongClientInterface
      */
     protected function preValidate(): void
     {
+        if ($this->isRaw) {
+            return;
+        }
+
         $apiKey = config('pdfkong.api_key');
 
         if (empty($apiKey)) {
@@ -245,8 +391,8 @@ class PDFKongClient implements PDFKongClientInterface
             throw new PDFKongException('You must specify a conversion source (e.g., url(), html(), file(), or markdown()) before sending the request.');
         }
 
-        if ($this->payload['mode'] === 'office' && empty($this->filePath)) {
-            throw new PDFKongException('File path is required for office/file conversion mode.');
+        if (in_array($this->payload['mode'], ['office', 'merge', 'watermark', 'protect']) && empty($this->filePath) && empty($this->files)) {
+            throw new PDFKongException('File path(s) required for this conversion mode.');
         }
 
         if (config('pdfkong.store_file') && !isset($this->payload['store_file'])) {
@@ -266,10 +412,15 @@ class PDFKongClient implements PDFKongClientInterface
         $timeout = config('pdfkong.timeout', 30);
 
         $request = Http::timeout($timeout)
+            ->withOptions($this->httpOptions)
             ->withHeaders([
                 'Accept' => 'application/json',
             ])
             ->withToken($apiKey);
+
+        if ($this->retryTimes > 0) {
+            $request->retry($this->retryTimes, $this->retrySleep);
+        }
             
         // If the user has a secret key, we might need to handle it.
         // Usually, the API requires the secret key in the payload or header for hashing.
@@ -282,6 +433,32 @@ class PDFKongClient implements PDFKongClientInterface
     }
 
     /**
+     * Handle failed API responses and throw specific exceptions.
+     *
+     * @param \Illuminate\Http\Client\Response $response
+     * @throws PDFKongException
+     */
+    protected function handleFailedResponse($response): void
+    {
+        $status = $response->status();
+        $message = 'PDFKong API Error: ' . $response->body();
+
+        switch ($status) {
+            case 401:
+            case 403:
+                throw new PDFKongAuthenticationException($message, $status);
+            case 402:
+                throw new PDFKongInsufficientCreditsException($message, $status);
+            case 422:
+                throw new PDFKongValidationException($message, $status);
+            case 429:
+                throw new PDFKongRateLimitException($message, $status);
+            default:
+                throw new PDFKongException($message, $status);
+        }
+    }
+
+    /**
      * Send the request and return the raw PDF bytes.
      *
      * @return string
@@ -291,12 +468,34 @@ class PDFKongClient implements PDFKongClientInterface
     {
         $this->preValidate();
 
-        $baseUrl = config('pdfkong.base_url', 'https://pdfkong.maktaby.online/api/v1');
+        $baseUrl = config('pdfkong.base_url', 'https://pdfkong.online/api/v1');
         $endpoint = rtrim($baseUrl, '/') . '/convert';
 
         $request = $this->buildRequest();
 
-        if ($this->payload['mode'] === 'office') {
+        if (!empty($this->files)) {
+            $request = $request->asMultipart();
+            foreach ($this->files as $key => $file) {
+                if (is_array($file)) {
+                    foreach ($file as $f) {
+                        if ($f instanceof \Illuminate\Http\UploadedFile) {
+                            $request->attach($key . '[]', file_get_contents($f->path()), $f->getClientOriginalName());
+                        } else {
+                            $request->attach($key . '[]', file_get_contents($f), basename($f));
+                        }
+                    }
+                } else {
+                    if ($file instanceof \Illuminate\Http\UploadedFile) {
+                        $request->attach($key, file_get_contents($file->path()), $file->getClientOriginalName());
+                    } else {
+                        // Use a generic key 'files[]' if numeric index, else use the string key
+                        $formKey = is_int($key) ? 'files[]' : $key;
+                        $request->attach($formKey, file_get_contents($file), basename($file));
+                    }
+                }
+            }
+            $response = $request->post($endpoint, $this->payload);
+        } elseif (!empty($this->filePath)) {
             $filename = basename($this->filePath);
             $response = $request->attach('file', file_get_contents($this->filePath), $filename)
                 ->post($endpoint, $this->payload);
@@ -305,7 +504,7 @@ class PDFKongClient implements PDFKongClientInterface
         }
 
         if ($response->failed()) {
-            throw new PDFKongException('PDFKong API Error: ' . $response->body(), $response->status());
+            $this->handleFailedResponse($response);
         }
 
         return $response->body();
@@ -335,12 +534,34 @@ class PDFKongClient implements PDFKongClientInterface
         // Force delivery mode to JSON if not set, though the API defaults to JSON anyway.
         $this->preValidate();
 
-        $baseUrl = config('pdfkong.base_url', 'https://pdfkong.maktaby.online/api/v1');
+        $baseUrl = config('pdfkong.base_url', 'https://pdfkong.online/api/v1');
         $endpoint = rtrim($baseUrl, '/') . '/convert';
 
         $request = $this->buildRequest();
 
-        if ($this->payload['mode'] === 'office') {
+        if (!empty($this->files)) {
+            $request = $request->asMultipart();
+            foreach ($this->files as $key => $file) {
+                if (is_array($file)) {
+                    foreach ($file as $f) {
+                        if ($f instanceof \Illuminate\Http\UploadedFile) {
+                            $request->attach($key . '[]', file_get_contents($f->path()), $f->getClientOriginalName());
+                        } else {
+                            $request->attach($key . '[]', file_get_contents($f), basename($f));
+                        }
+                    }
+                } else {
+                    if ($file instanceof \Illuminate\Http\UploadedFile) {
+                        $request->attach($key, file_get_contents($file->path()), $file->getClientOriginalName());
+                    } else {
+                        // Use a generic key 'files[]' if numeric index, else use the string key
+                        $formKey = is_int($key) ? 'files[]' : $key;
+                        $request->attach($formKey, file_get_contents($file), basename($file));
+                    }
+                }
+            }
+            $response = $request->post($endpoint, $this->payload);
+        } elseif (!empty($this->filePath)) {
             $filename = basename($this->filePath);
             $response = $request->attach('file', file_get_contents($this->filePath), $filename)
                 ->post($endpoint, $this->payload);
@@ -349,10 +570,122 @@ class PDFKongClient implements PDFKongClientInterface
         }
 
         if ($response->failed()) {
-            throw new PDFKongException('PDFKong API Error: ' . $response->body(), $response->status());
+            $this->handleFailedResponse($response);
         }
 
         return $response->json() ?? [];
+    }
+
+    /**
+     * Get the current user's usage and credits.
+     *
+     * @return array
+     * @throws PDFKongException
+     */
+    public function usage(): array
+    {
+        $baseUrl = config('pdfkong.base_url', 'https://pdfkong.online/api/v1');
+        $endpoint = rtrim($baseUrl, '/') . '/usage';
+        $response = $this->buildRequest()->get($endpoint);
+        
+        if ($response->failed()) {
+            $this->handleFailedResponse($response);
+        }
+        return $response->json() ?? [];
+    }
+
+    /**
+     * Get a paginated list of previously generated PDFs.
+     *
+     * @param int $page
+     * @param int $perPage
+     * @return array
+     * @throws PDFKongException
+     */
+    public function list(int $page = 1, int $perPage = 15): array
+    {
+        $baseUrl = config('pdfkong.base_url', 'https://pdfkong.online/api/v1');
+        $endpoint = rtrim($baseUrl, '/') . '/list';
+        $response = $this->buildRequest()->get($endpoint, [
+            'page' => $page,
+            'per_page' => $perPage,
+        ]);
+        
+        if ($response->failed()) {
+            $this->handleFailedResponse($response);
+        }
+        return $response->json() ?? [];
+    }
+
+    /**
+     * Delete a specific PDF file from the server.
+     *
+     * @param string $taskId
+     * @return array
+     * @throws PDFKongException
+     */
+    public function remove(string $taskId): array
+    {
+        $baseUrl = config('pdfkong.base_url', 'https://pdfkong.online/api/v1');
+        $endpoint = rtrim($baseUrl, '/') . '/remove/' . $taskId;
+        $response = $this->buildRequest()->delete($endpoint);
+        
+        if ($response->failed()) {
+            $this->handleFailedResponse($response);
+        }
+        return $response->json() ?? [];
+    }
+
+    /**
+     * Check the status of an asynchronous batch job.
+     *
+     * @param string $batchId
+     * @return array
+     * @throws PDFKongException
+     */
+    public function batchStatus(string $batchId): array
+    {
+        $baseUrl = config('pdfkong.base_url', 'https://pdfkong.online/api/v1');
+        $endpoint = rtrim($baseUrl, '/') . '/batch/' . $batchId . '/status';
+        $response = $this->buildRequest()->get($endpoint);
+        
+        if ($response->failed()) {
+            $this->handleFailedResponse($response);
+        }
+        return $response->json() ?? [];
+    }
+
+    /**
+     * Download a completed batch job.
+     *
+     * @param string $batchId
+     * @param string $savePath
+     * @return bool
+     * @throws PDFKongException
+     */
+    public function batchDownload(string $batchId, string $savePath): bool
+    {
+        $baseUrl = config('pdfkong.base_url', 'https://pdfkong.online/api/v1');
+        $endpoint = rtrim($baseUrl, '/') . '/batch/' . $batchId . '/download';
+        $response = $this->buildRequest()->get($endpoint);
+        
+        if ($response->failed()) {
+            $this->handleFailedResponse($response);
+        }
+        
+        return file_put_contents($savePath, $response->body()) !== false;
+    }
+
+    /**
+     * Run the conversion asynchronously in the background.
+     *
+     * @param bool $enable
+     * @return $this
+     */
+    public function async(bool $enable = true): self
+    {
+        $this->payload['async'] = $enable;
+        return $this;
     }
 
     /**
