@@ -127,6 +127,19 @@ class PDFKongClient implements PDFKongClientInterface
     }
 
     /**
+     * Start a conversion from an image file.
+     *
+     * @param string $filePath
+     * @return $this
+     */
+    public function image(string $filePath): self
+    {
+        $this->payload['mode'] = 'image';
+        $this->filePath = $filePath;
+        return $this;
+    }
+
+    /**
      * Merge multiple PDFs.
      *
      * @param array $filePaths
@@ -421,7 +434,7 @@ class PDFKongClient implements PDFKongClientInterface
             throw new PDFKongException('You must specify a conversion source (e.g., url(), html(), file(), or markdown()) before sending the request.');
         }
 
-        if (in_array($this->payload['mode'], ['office', 'merge', 'watermark', 'protect']) && empty($this->filePath) && empty($this->files)) {
+        if (in_array($this->payload['mode'], ['office', 'image', 'merge', 'watermark', 'protect']) && empty($this->filePath) && empty($this->files)) {
             throw new PDFKongException('File path(s) required for this conversion mode.');
         }
 

@@ -34,6 +34,13 @@ class PDFKongFake implements PDFKongClientInterface
         return $this;
     }
 
+    public function image(string $filePath): self
+    {
+        $this->currentPayload['mode'] = 'image';
+        $this->currentPayload['file'] = $filePath;
+        return $this;
+    }
+
     public function merge(array $filePaths): self
     {
         $this->currentPayload['mode'] = 'merge';

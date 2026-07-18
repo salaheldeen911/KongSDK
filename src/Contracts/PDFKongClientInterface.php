@@ -63,6 +63,14 @@ interface PDFKongClientInterface
     public function office(string $filePath);
 
     /**
+     * Start a conversion from an image file.
+     *
+     * @param string $filePath
+     * @return \PDFKong\PDFKongClient
+     */
+    public function image(string $filePath);
+
+    /**
      * Merge multiple PDFs.
      *
      * @param array $filePaths
