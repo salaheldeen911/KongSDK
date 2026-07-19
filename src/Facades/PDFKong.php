@@ -3,6 +3,8 @@
 namespace PDFKong\Facades;
 
 use Illuminate\Support\Facades\Facade;
+use PDFKong\PDFKongClient;
+use PDFKong\Testing\PDFKongFake;
 
 /**
  * @method static \PDFKong\Contracts\PDFKongClientInterface url(string $url)
@@ -36,20 +38,21 @@ use Illuminate\Support\Facades\Facade;
  * @method static \PDFKong\Contracts\PDFKongClientInterface footerHtml(string $html)
  * @method static \PDFKong\Contracts\PDFKongClientInterface parseLiquid(bool $enable = true)
  * @method static \PDFKong\Contracts\PDFKongClientInterface liquidData(array|string $data)
- * 
- * @see \PDFKong\PDFKongClient
+ *
+ * @see PDFKongClient
  */
 class PDFKong extends Facade
 {
     /**
      * Replace the bound instance with a fake.
      *
-     * @return \PDFKong\Testing\PDFKongFake
+     * @return PDFKongFake
      */
     public static function fake()
     {
-        $fake = new \PDFKong\Testing\PDFKongFake();
+        $fake = new PDFKongFake;
         static::swap($fake);
+
         return $fake;
     }
 

@@ -31,13 +31,13 @@ class PDFKongClientTest extends TestCase
     public function test_it_sends_a_successful_url_conversion_request()
     {
         Http::fake([
-            'pdfkong.online/api/v1/convert' => Http::response(['task_id' => '123', 'status' => 'processing'], 200)
+            'pdfkong.online/api/v1/convert' => Http::response(['task_id' => '123', 'status' => 'processing'], 200),
         ]);
 
         $response = PDFKong::url('https://example.com')->send();
 
         $this->assertEquals('123', $response['task_id']);
-        
+
         Http::assertSent(function ($request) {
             return $request->url() == 'https://pdfkong.online/api/v1/convert' &&
                    $request['mode'] == 'url' &&
@@ -48,7 +48,7 @@ class PDFKongClientTest extends TestCase
     public function test_deliver_to_webhook_auto_enables_async()
     {
         Http::fake([
-            '*' => Http::response(['task_id' => '456'], 200)
+            '*' => Http::response(['task_id' => '456'], 200),
         ]);
 
         PDFKong::url('https://example.com')
@@ -65,7 +65,7 @@ class PDFKongClientTest extends TestCase
     public function test_magic_methods_are_converted_to_snake_case()
     {
         Http::fake([
-            '*' => Http::response([], 200)
+            '*' => Http::response([], 200),
         ]);
 
         PDFKong::url('https://example.com')
@@ -82,7 +82,7 @@ class PDFKongClientTest extends TestCase
     public function test_return_as_base64_sets_delivery_mode()
     {
         Http::fake([
-            '*' => Http::response(['base64_data' => 'SGVsbG8='], 200)
+            '*' => Http::response(['base64_data' => 'SGVsbG8='], 200),
         ]);
 
         $response = PDFKong::url('https://example.com')
@@ -90,7 +90,7 @@ class PDFKongClientTest extends TestCase
             ->send();
 
         $this->assertEquals('SGVsbG8=', $response['base64_data']);
-        
+
         Http::assertSent(function ($request) {
             return $request['delivery_mode'] === 'base64';
         });

@@ -19,7 +19,7 @@ class PDFKongServiceProvider extends ServiceProvider
 
         // Bind the interface to the implementation
         $this->app->bind(PDFKongClientInterface::class, function ($app) {
-            return new PDFKongClient();
+            return new PDFKongClient;
         });
 
         // Bind the facade name

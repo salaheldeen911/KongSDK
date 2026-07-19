@@ -9,13 +9,13 @@ return [
     | You can find these in your PDFKong dashboard.
     */
     'api_key' => env('PDFKONG_API_KEY'),
-    
+
     // The Secret Key from the dashboard, used for payload hashing
     // or URL signing to ensure your API Key is protected.
     'secret_key' => env('PDFKONG_SECRET_KEY'),
-    
+
     'base_url' => env('PDFKONG_BASE_URL', 'https://pdfkong.online/api/v1'),
-    
+
     /*
     |--------------------------------------------------------------------------
     | Retention Policy (Store File)
@@ -49,15 +49,15 @@ return [
     | S3 Delivery Configuration
     |--------------------------------------------------------------------------
     | If you plan to use delivery_mode = 's3', you can define your S3 credentials
-    | here. The package will automatically attach these to your request when 
+    | here. The package will automatically attach these to your request when
     | S3 delivery is requested, keeping your controllers clean.
     */
     's3' => [
-        'bucket_name'        => env('PDFKONG_S3_BUCKET'),
-        'access_key_id'      => env('PDFKONG_S3_ACCESS_KEY'),
-        'secret_access_key'  => env('PDFKONG_S3_SECRET_KEY'),
-        'region'             => env('PDFKONG_S3_REGION', 'us-east-1'),
-        'path_prefix'        => env('PDFKONG_S3_PATH_PREFIX', ''), // e.g. 'exports/pdfs/'
+        'bucket_name' => env('PDFKONG_S3_BUCKET'),
+        'access_key_id' => env('PDFKONG_S3_ACCESS_KEY'),
+        'secret_access_key' => env('PDFKONG_S3_SECRET_KEY'),
+        'region' => env('PDFKONG_S3_REGION', 'us-east-1'),
+        'path_prefix' => env('PDFKONG_S3_PATH_PREFIX', ''), // e.g. 'exports/pdfs/'
     ],
 
     /*
@@ -65,12 +65,12 @@ return [
     | Google Cloud Storage Delivery Configuration
     |--------------------------------------------------------------------------
     | If you plan to use delivery_mode = 'google_storage', you can define your GCS credentials
-    | here. The package will automatically attach these to your request when 
+    | here. The package will automatically attach these to your request when
     | Google Storage delivery is requested.
     */
     'google_storage' => [
-        'project_id'  => env('PDFKONG_GCP_PROJECT_ID'),
-        'user_email'  => env('PDFKONG_GCP_USER_EMAIL'),
+        'project_id' => env('PDFKONG_GCP_PROJECT_ID'),
+        'user_email' => env('PDFKONG_GCP_USER_EMAIL'),
         'private_key' => env('PDFKONG_GCP_PRIVATE_KEY'),
         'bucket_name' => env('PDFKONG_GCP_BUCKET'),
     ],
